@@ -1,0 +1,180 @@
+    (function ($) {
+
+        $(document).ready(function () {
+
+$.getScript("/js/spellcheck_global.js");
+            var addWord = $("#addWord");
+
+            var $dialog = $('#dialog-form')
+            .dialog({
+                autoOpen: false,
+                title: 'Edit Dictionary',
+                modal: true,
+                closeOnEscape: true,
+                //height: 400,
+                width: 375,
+                buttons: {
+                    "Add word": function () {
+                        var bValid = true;
+                        if ($('#wordAdd').val().length < 1) {
+                            $('#wordAdd').addClass("ui-state-error");
+                            $('.validateWord').text("Please enter a word");
+                            bValid = false;
+                        }
+                        else {
+                            for (var i = 0; i < userWords.length; i++) {
+                                if (userWords[i] == $('#wordAdd').val()) {
+                                    alert("Word already exists in dictionary");
+                                    bValid = false;
+                                }
+                            }
+                        }
+                        var rege = /[\33-\77]/;
+                        if (rege.test($('#wordAdd').val())) {
+                            alert("Cannot have spaces, punctuation or numbers in word");
+                            bValid = false;
+                        }
+                        if (bValid) {
+                            userWords.push($('#wordAdd').val());
+                            $("#words tbody").append("<tr>" +
+                            "<td>" + $('#wordAdd').val() + "</td>" + "</tr>");
+                            $('#wordAdd').removeClass("ui-state-error");
+                            $('.validateWord').text("");
+                            $('#wordAdd').val("");
+                        }
+                        $(':button').removeClass("ui-state-focus");
+
+                    },
+                    Delete: function () {
+                        if ($('.ui-state-highlight').html() != null) {
+                            for (var i = 0; i < userWords.length; i++) {
+                                if (userWords[i] == $('.ui-state-highlight').html()) {
+                                    //delete userWords[i];
+                                    userWords[i] = "";
+                                }
+                            }
+                            $('.ui-state-highlight').remove();
+                            $('#wordAdd').val("");
+                        }
+                        else {
+                            alert("Please select a word to delete");
+                        }
+                        $(':button').removeClass("ui-state-focus");
+                        $('#wordAdd').removeClass("ui-state-error");
+                        $('.validateWord').text("");
+
+
+                    },
+                    Save: function () {
+                        var textToInsert = '';
+                        userWords.sort();
+                        for (var i = 0; i < userWords.length; i++) {
+                            if (userWords[i] != "undefined" && userWords[i] != "") {
+                                textToInsert += "\"" + userWords[i] + "\"";
+                                if (i < (userWords.length - 1)) {
+                                    textToInsert += ",";
+                                }
+                            }
+                        }
+                        $.post("/core/Handlers/utilities/spellchecker.ashx", {
+                            words: "{\"UserDictionary\":{\"Words\":[" + textToInsert + "]}}",
+                            action: "UpdateUserDictionary",
+                            format: "Json"
+                        },
+                            function (data) {
+
+                            });
+
+                        // JG - When saving, the temporary array must be made an exact copy of userWords.
+                        // Since the changes have been committed and there will be no cancellation of the changes.
+                        tempUserWords.length = 0;
+                        tempUserWords = [].concat(userWords);
+
+                        $("#words tbody tr").remove();
+                        $('#wordAdd').removeClass("ui-state-error");
+                        $('.validateWord').text("");
+                        $(this).dialog("close");
+                    }
+                },
+                close: function () {
+                    $("#words tbody tr").remove();
+
+                    // JG - If the changes done in the UI are not saved, this code will revert the  
+                    // changes on the userWords array and empty out the temporary array.
+                    userWords.length = 0;
+                    userWords = [].concat(tempUserWords);
+                    tempUserWords.length = 0;
+
+                    $('#wordAdd').removeClass("ui-state-error");
+                    $('.validateWord').text("");
+                }
+            });
+
+
+
+            $('#modal').live('click', function () {
+
+                $('#wordAdd').val("");
+
+                $.getJSON("/core/Handlers/utilities/spellchecker.ashx?",
+             {
+                 action: "GetUserDictionary",
+                 format: "Json"
+             },
+            function (data) {
+                $.each(data.UserDictionary.Words, function (i, Words) {
+                    // JG - Save dictionary words to userWords local array and a temporary local array used  
+                    // to restore the userWords on modal dialog closing(especially on cancellation).
+                    userWords.push(Words);
+                    if ($.inArray(Words, tempUserWords) == -1) {
+                        tempUserWords.push(Words);
+                    }
+                });
+            });
+
+                userWords.sort();
+                var textToInsert = '';
+                for (var i = 0; i < userWords.length; i++) {
+                    if (userWords[i] != "undefined" && userWords[i] != "") {
+                        textToInsert += "<tr>" + "<td>" + userWords[i] + "</td>" + "</tr>";
+                    }
+                }
+                $("#words tbody").append(textToInsert);
+
+                $(".spellcheck-suggestbox").fadeOut(250);
+
+                $dialog.dialog('open');
+
+                userWords.length = 0;
+            });
+
+
+
+
+
+        });
+
+        $('#words td').live("mouseenter", function () {
+            $(this).addClass("ui-state-hover");
+        });
+        $('#words td').live("mouseleave", function () {
+            $(this).removeClass("ui-state-hover");
+        });
+        $('#words td').live("click", function () {
+            if ($(this).hasClass("ui-state-highlight")) {
+                $('#words td').removeClass("ui-state-highlight");
+            }
+            else {
+                $('#words td').removeClass("ui-state-highlight");
+                $(this).addClass("ui-state-highlight");
+            }
+
+
+        });
+
+        $('#words td').live("click", function () {
+            $('#wordAdd').val($(this).text());
+        });
+
+
+    })(jQuery);
